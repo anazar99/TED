@@ -106,10 +106,10 @@ def main(_argv):
         class_names = utils.read_class_names(cfg.YOLO.CLASSES)
 
         # by default allow all classes in .names file
-        allowed_classes = list(class_names.values())
+        #allowed_classes = list(class_names.values())
         
         # custom allowed classes (uncomment line below to allow detections for only people)
-        #allowed_classes = ['person']
+        allowed_classes = ['chair']
 
         # if crop flag is enabled, crop each detection and save it as new image
         if FLAGS.crop:

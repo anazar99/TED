@@ -24,11 +24,11 @@ flags.DEFINE_string('weights', './checkpoints/yolov4-416',
 flags.DEFINE_integer('size', 416, 'resize images to')
 flags.DEFINE_boolean('tiny', False, 'yolo or yolo-tiny')
 flags.DEFINE_string('model', 'yolov4', 'yolov3 or yolov4')
-flags.DEFINE_string('video', './data/video/video.mp4', 'path to input video or set to 0 for webcam')
+flags.DEFINE_string('video', './data/video/test.mp4', 'path to input video or set to 0 for webcam')
 flags.DEFINE_string('output', None, 'path to output video')
 flags.DEFINE_string('output_format', 'XVID', 'codec used in VideoWriter when saving video to file')
 flags.DEFINE_float('iou', 0.45, 'iou threshold')
-flags.DEFINE_float('score', 0.50, 'score threshold')
+flags.DEFINE_float('score', 0.45, 'score threshold')
 flags.DEFINE_boolean('count', False, 'count objects within video')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'print info on detections')
@@ -82,29 +82,18 @@ def main(_argv):
         else:
             print('Video has ended or failed, try a different video format!')
             break
-    
+
         frame_size = frame.shape[:2]
         image_data = cv2.resize(frame, (input_size, input_size))
         image_data = image_data / 255.
         image_data = image_data[np.newaxis, ...].astype(np.float32)
         start_time = time.time()
 
-        if FLAGS.framework == 'tflite':
-            interpreter.set_tensor(input_details[0]['index'], image_data)
-            interpreter.invoke()
-            pred = [interpreter.get_tensor(output_details[i]['index']) for i in range(len(output_details))]
-            if FLAGS.model == 'yolov3' and FLAGS.tiny == True:
-                boxes, pred_conf = filter_boxes(pred[1], pred[0], score_threshold=0.25,
-                                                input_shape=tf.constant([input_size, input_size]))
-            else:
-                boxes, pred_conf = filter_boxes(pred[0], pred[1], score_threshold=0.25,
-                                                input_shape=tf.constant([input_size, input_size]))
-        else:
-            batch_data = tf.constant(image_data)
-            pred_bbox = infer(batch_data)
-            for key, value in pred_bbox.items():
-                boxes = value[:, :, 0:4]
-                pred_conf = value[:, :, 4:]
+        batch_data = tf.constant(image_data)
+        pred_bbox = infer(batch_data)
+        for key, value in pred_bbox.items():
+            boxes = value[:, :, 0:4]
+            pred_conf = value[:, :, 4:]
 
         boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
             boxes=tf.reshape(boxes, (tf.shape(boxes)[0], -1, 1, 4)),
@@ -122,52 +111,31 @@ def main(_argv):
 
         pred_bbox = [bboxes, scores.numpy()[0], classes.numpy()[0], valid_detections.numpy()[0]]
 
-        # read in all class names from config
-        class_names = utils.read_class_names(cfg.YOLO.CLASSES)
-
-        # by default allow all classes in .names file
-        allowed_classes = list(class_names.values())
-        
         # custom allowed classes (uncomment line below to allow detections for only people)
-        #allowed_classes = ['person']
+        classes = ['chair', 'person']
 
-        # if crop flag is enabled, crop each detection and save it as new image
-        if FLAGS.crop:
-            crop_rate = 150 # capture images every so many frames (ex. crop photos every 150 frames)
-            crop_path = os.path.join(os.getcwd(), 'detections', 'crop', video_name)
-            try:
-                os.mkdir(crop_path)
-            except FileExistsError:
-                pass
-            if frame_num % crop_rate == 0:
-                final_path = os.path.join(crop_path, 'frame_' + str(frame_num))
-                try:
-                    os.mkdir(final_path)
-                except FileExistsError:
-                    pass          
-                crop_objects(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), pred_bbox, final_path, allowed_classes)
-            else:
-                pass
+        # count objects found
+        counted_classes = count_objects(pred_bbox, by_class = True, allowed_classes=classes)
+        # loop through dict and print
+        for key, value in counted_classes.items():
+            print("Number of {}s: {}".format(key, value))
+        image = utils.draw_bbox(frame, pred_bbox, FLAGS.info, counted_classes, allowed_classes=classes, read_plate=FLAGS.plate)
+        cv2.putText(image, "Chairs Expected: 48", (5, 75),
+                        cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 0), 2)
+        cv2.putText(image, "Students Expected: 4", (5, 50),
+                        cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 0), 2)
 
-        if FLAGS.count:
-            # count objects found
-            counted_classes = count_objects(pred_bbox, by_class = False, allowed_classes=allowed_classes)
-            # loop through dict and print
-            for key, value in counted_classes.items():
-                print("Number of {}s: {}".format(key, value))
-            image = utils.draw_bbox(frame, pred_bbox, FLAGS.info, counted_classes, allowed_classes=allowed_classes, read_plate=FLAGS.plate)
-        else:
-            image = utils.draw_bbox(frame, pred_bbox, FLAGS.info, allowed_classes=allowed_classes, read_plate=FLAGS.plate)
-        
         fps = 1.0 / (time.time() - start_time)
         print("FPS: %.2f" % fps)
+        cv2.putText(image, "FPS: {}".format(fps), (850, 20),
+                        cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 0), 2)
         result = np.asarray(image)
         cv2.namedWindow("result", cv2.WINDOW_AUTOSIZE)
         result = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        
+
         if not FLAGS.dont_show:
             cv2.imshow("result", result)
-        
+
         if FLAGS.output:
             out.write(result)
         if cv2.waitKey(1) & 0xFF == ord('q'): break

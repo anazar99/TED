@@ -77,7 +77,7 @@ def recognize_plate(img, coords):
             # clean tesseract text by removing any unwanted blank spaces
             clean_text = re.sub('[\W_]+', '', text)
             plate_num += clean_text
-        except: 
+        except:
             text = None
     if plate_num != None:
         print("License Plate #: ", plate_num)
@@ -240,7 +240,7 @@ def draw_bbox(image, bboxes, info = False, counted_classes = None, show_label=Tr
                 height_ratio = int(image_h / 25)
                 plate_number = recognize_plate(image, coor)
                 if plate_number != None:
-                    cv2.putText(image, plate_number, (int(coor[0]), int(coor[1]-height_ratio)), 
+                    cv2.putText(image, plate_number, (int(coor[0]), int(coor[1]-height_ratio)),
                             cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255,255,0), 2)
 
             bbox_color = colors[class_ind]
@@ -253,6 +253,8 @@ def draw_bbox(image, bboxes, info = False, counted_classes = None, show_label=Tr
 
             if show_label:
                 bbox_mess = '%s: %.2f' % (class_name, score)
+                if class_name == "person":
+                    bbox_mess = '%s: %.2f' % ("Student", score)
                 t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
                 c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
                 cv2.rectangle(image, c1, (np.float32(c3[0]), np.float32(c3[1])), bbox_color, -1) #filled
@@ -264,9 +266,12 @@ def draw_bbox(image, bboxes, info = False, counted_classes = None, show_label=Tr
                 height_ratio = int(image_h / 25)
                 offset = 15
                 for key, value in counted_classes.items():
-                    cv2.putText(image, "{}s detected: {}".format(key, value), (5, offset),
-                            cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 255, 0), 2)
-                    offset += height_ratio
+                	if key == 'person':
+                		cv2.putText(image, "Students detected: {}".format(value), (5, height_ratio + 3), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 255, 0), 2)
+                		offset += height_ratio
+                	else:
+                		cv2.putText(image, "Chairs detected: {}".format(value), (5, 30), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 255, 0), 2)
+
     return image
 
 def bbox_iou(bboxes1, bboxes2):
@@ -479,4 +484,3 @@ def unfreeze_all(model, frozen=False):
     if isinstance(model, tf.keras.Model):
         for l in model.layers:
             unfreeze_all(l, frozen)
-
