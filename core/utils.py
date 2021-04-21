@@ -246,6 +246,8 @@ def draw_bbox(image, bboxes, info = False, counted_classes = None, show_label=Tr
             bbox_color = colors[class_ind]
             bbox_thick = int(0.6 * (image_h + image_w) / 600)
             c1, c2 = (coor[0], coor[1]), (coor[2], coor[3])
+            # added midpoint
+            midpoint = (((c1[0] + c2[0]) / 2), ((c1[1] + c2[1]) / 2))
             cv2.rectangle(image, c1, c2, bbox_color, bbox_thick)
 
             if info:
@@ -257,6 +259,7 @@ def draw_bbox(image, bboxes, info = False, counted_classes = None, show_label=Tr
                     bbox_mess = '%s: %.2f' % ("Student", score)
                 t_size = cv2.getTextSize(bbox_mess, 0, fontScale, thickness=bbox_thick // 2)[0]
                 c3 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
+                midpointStudents = (((c1[0] + c3[0]) / 2), ((c1[1] + c3[1]) / 2))
                 cv2.rectangle(image, c1, (np.float32(c3[0]), np.float32(c3[1])), bbox_color, -1) #filled
 
                 cv2.putText(image, bbox_mess, (c1[0], np.float32(c1[1] - 2)), cv2.FONT_HERSHEY_SIMPLEX,
